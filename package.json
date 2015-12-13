@@ -1,6 +1,6 @@
 {
   "name": "pegasus-loader",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "description": "File-System based Route declarations for React Router",
   "repository": {
     "type": "git",
@@ -20,5 +20,8 @@
   },
   "devDependencies": {
     "rimraf": "^2.4.3"
+  },
+  "dependencies": {
+    "loader-utils": "^0.2.12"
   }
 }

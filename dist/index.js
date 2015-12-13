@@ -2,6 +2,8 @@
 
 var _interopRequireWildcard = function (obj) { return obj && obj.__esModule ? obj : { "default": obj }; };
 
+var _toConsumableArray = function (arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) arr2[i] = arr[i]; return arr2; } else { return Array.from(arr); } };
+
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
@@ -9,6 +11,10 @@ Object.defineProperty(exports, "__esModule", {
 var _fs = require("fs");
 
 var _fs2 = _interopRequireWildcard(_fs);
+
+var _loaderUtils = require("loader-utils");
+
+var _loaderUtils2 = _interopRequireWildcard(_loaderUtils);
 
 exports["default"] = function (source) {
   var _this = this;
@@ -33,7 +39,8 @@ exports["default"] = function (source) {
     var route = {
       component: null,
       path: null,
-      childRoutes: []
+      childRoutes: [],
+      dynamicRoutes: []
     };
 
     _fs2["default"].readdirSync(directory).forEach(function (file) {
@@ -46,10 +53,12 @@ exports["default"] = function (source) {
 
         var path = directory.replace(basePath, "");
 
+        // all react-router paths are absolute
         if (path === "") {
           path = "/";
-        } else if (path.startsWith("/")) {
-          path = path.replace(/^\//, "");
+        } else {
+          // simply replace @ with : for dynamic segments in react-router
+          path = path.replace(/@/g, ":");
         }
 
         route.path = path;
@@ -58,14 +67,20 @@ exports["default"] = function (source) {
           var childRoute = buildRouteForDirectory(fullPath);
 
           if (childRoute) {
-            route.childRoutes.push(childRoute);
+            if (file.startsWith("@")) {
+              route.dynamicRoutes.push(childRoute);
+            } else {
+              route.childRoutes.push(childRoute);
+            }
           }
         }
       }
     });
 
     if (route.component && route.path) {
-      return "\n        {\n          component: require(" + JSON.stringify(route.component) + ")\n        , path: " + JSON.stringify(route.path) + "\n        , childRoutes: [" + route.childRoutes.join(",") + "]\n        }\n      ";
+      var childRoutes = [].concat(_toConsumableArray(route.childRoutes), _toConsumableArray(route.dynamicRoutes));
+
+      return "\n        {\n          getComponents: function(location, callback) {\n            require.ensure([], function(require) {\n              callback(null,\n                require(" + _loaderUtils2["default"].stringifyRequest(_this, route.component) + ")\n              );\n            });\n          }\n        , path: " + JSON.stringify(route.path) + "\n        , childRoutes: [" + childRoutes.join(",") + "]\n        }\n      ";
     } else {
       return null;
     }

@@ -1,4 +1,5 @@
 import fs from "fs";
+import loaderUtils from "loader-utils";
 
 export default function(source) {
   let callback = this.async();
@@ -12,6 +13,7 @@ export default function(source) {
       component: null
     , path: null
     , childRoutes: []
+    , dynamicRoutes: []
     };
 
     fs.readdirSync(directory).forEach((file) => {
@@ -24,11 +26,13 @@ export default function(source) {
 
         let path = directory.replace(basePath, "");
 
+        // all react-router paths are absolute
         if(path === "") {
           path = "/";
         }
-        else if(path.startsWith("/")) {
-          path = path.replace(/^\//, "");
+        else {
+          // simply replace @ with : for dynamic segments in react-router
+          path = path.replace(/@/g, ":");
         }
 
         route.path = path;
@@ -38,18 +42,31 @@ export default function(source) {
           let childRoute = buildRouteForDirectory(fullPath);
 
           if(childRoute) {
-            route.childRoutes.push(childRoute);
+            if(file.startsWith("@")) {
+              route.dynamicRoutes.push(childRoute);
+            }
+            else {
+              route.childRoutes.push(childRoute);
+            }
           }
         }
       }
     });
 
     if(route.component && route.path) {
+      let childRoutes = [...route.childRoutes, ...route.dynamicRoutes];
+
       return `
         {
-          component: require(${JSON.stringify(route.component)})
+          getComponents: function(location, callback) {
+            require.ensure([], function(require) {
+              callback(null,
+                require(${loaderUtils.stringifyRequest(this, route.component)})
+              );
+            });
+          }
         , path: ${JSON.stringify(route.path)}
-        , childRoutes: [${route.childRoutes.join(",")}]
+        , childRoutes: [${childRoutes.join(",")}]
         }
       `;
     }
