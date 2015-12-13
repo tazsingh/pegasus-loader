@@ -1,7 +1,7 @@
 {
   "name": "pegasus-loader",
   "version": "1.0.0",
-  "description": "File-System based Route declarations for React Router",
+  "description": "Project Structure based Route declarations for React Router and Webpack",
   "repository": {
     "type": "git",
     "url": "https://github.com/tazsingh/pegasus-loader.git"
@@ -16,7 +16,7 @@
   "author": "Tasveer Singh",
   "license": "MIT",
   "engines": {
-    "node": ">=0.12.0"
+    "node": ">=4.0.0"
   },
   "devDependencies": {
     "rimraf": "^2.4.3"
