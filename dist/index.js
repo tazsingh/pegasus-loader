@@ -1,22 +1,23 @@
 "use strict";
 
-var _interopRequireWildcard = function (obj) { return obj && obj.__esModule ? obj : { "default": obj }; };
-
-var _toConsumableArray = function (arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) arr2[i] = arr[i]; return arr2; } else { return Array.from(arr); } };
-
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+exports["default"] = pegasusLoader;
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { "default": obj }; }
+
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) arr2[i] = arr[i]; return arr2; } else { return Array.from(arr); } }
 
 var _fs = require("fs");
 
-var _fs2 = _interopRequireWildcard(_fs);
+var _fs2 = _interopRequireDefault(_fs);
 
 var _loaderUtils = require("loader-utils");
 
-var _loaderUtils2 = _interopRequireWildcard(_loaderUtils);
+var _loaderUtils2 = _interopRequireDefault(_loaderUtils);
 
-exports["default"] = function (source) {
+function pegasusLoader(source) {
   var _this = this;
 
   var callback = this.async();
@@ -25,17 +26,7 @@ exports["default"] = function (source) {
 
   var basePath = this.context;
 
-  var buildRouteForDirectory = (function (_buildRouteForDirectory) {
-    function buildRouteForDirectory(_x) {
-      return _buildRouteForDirectory.apply(this, arguments);
-    }
-
-    buildRouteForDirectory.toString = function () {
-      return _buildRouteForDirectory.toString();
-    };
-
-    return buildRouteForDirectory;
-  })(function (directory) {
+  var buildRouteForDirectory = function buildRouteForDirectory(directory, parentDirectoryPath) {
     var route = {
       component: null,
       path: null,
@@ -43,28 +34,53 @@ exports["default"] = function (source) {
       dynamicRoutes: []
     };
 
-    _fs2["default"].readdirSync(directory).forEach(function (file) {
-      var fullPath = "" + directory + "/" + file;
+    var directoryItems = _fs2["default"].readdirSync(directory);
 
-      if (file === "index.js") {
-        _this.dependency(fullPath);
+    var indexOfRouteComponent = directoryItems.indexOf("index.js");
 
-        route.component = fullPath;
+    // evaluate the route component first to set up parent paths
+    if (indexOfRouteComponent >= 0) {
+      var fullPath = directory + "/index.js";
 
-        var path = directory.replace(basePath, "");
+      directoryItems.splice(indexOfRouteComponent, 1);
 
-        // all react-router paths are absolute
-        if (path === "") {
-          path = "/";
-        } else {
-          // simply replace @ with : for dynamic segments in react-router
-          path = path.replace(/@/g, ":");
-        }
+      console.log("FULL PATH", fullPath);
+      _this.dependency(fullPath);
 
-        route.path = path;
-      } else if (file !== "node_modules" && file !== ".git") {
+      route.component = fullPath;
+
+      var path = undefined;
+
+      if (parentDirectoryPath) {
+        path = directory.replace(parentDirectoryPath, "");
+      } else {
+        path = directory.replace(basePath, "");
+      }
+
+      // all react-router paths are absolute
+      if (path === "") {
+        path = "/";
+      } else {
+        // simply replace @ with : for dynamic segments in react-router
+        path = path.replace(/@/g, ":");
+      }
+
+      // this is now the parent route path of any child routes processed later
+      parentDirectoryPath = directory + "/";
+
+      console.log("PATH", path);
+
+      route.path = path;
+    }
+
+    directoryItems.forEach(function (file) {
+      var fullPath = directory + "/" + file;
+
+      if (file !== "node_modules" && file !== ".git") {
         if (_fs2["default"].statSync(fullPath).isDirectory()) {
-          var childRoute = buildRouteForDirectory(fullPath);
+          console.log("PARENT PATH", parentDirectoryPath);
+
+          var childRoute = buildRouteForDirectory(fullPath, parentDirectoryPath);
 
           if (childRoute) {
             if (file.startsWith("@")) {
@@ -78,17 +94,19 @@ exports["default"] = function (source) {
     });
 
     if (route.component && route.path) {
+      // evaluate static routes first and dynamic segments last
       var childRoutes = [].concat(_toConsumableArray(route.childRoutes), _toConsumableArray(route.dynamicRoutes));
 
+      // this is the only bit of code emitted to your application
       return "\n        {\n          getComponents: function(location, callback) {\n            require.ensure([], function(require) {\n              callback(null,\n                require(" + _loaderUtils2["default"].stringifyRequest(_this, route.component) + ")\n              );\n            });\n          }\n        , path: " + JSON.stringify(route.path) + "\n        , childRoutes: [" + childRoutes.join(",") + "]\n        }\n      ";
     } else {
       return null;
     }
-  });
+  };
 
   var routes = buildRouteForDirectory(basePath);
 
   finalCallback(null, "module.exports = " + routes + ";");
-};
+}
 
 module.exports = exports["default"];

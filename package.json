@@ -19,7 +19,8 @@
     "node": ">=4.0.0"
   },
   "devDependencies": {
-    "rimraf": "^2.4.3"
+    "rimraf": "^2.4.3",
+    "babel": "<6.0.0"
   },
   "dependencies": {
     "loader-utils": "^0.2.12"

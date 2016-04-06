@@ -1,14 +1,14 @@
 import fs from "fs";
 import loaderUtils from "loader-utils";
 
-export default function(source) {
+export default function pegasusLoader(source) {
   let callback = this.async();
   let isSync = "function" !== typeof callback;
   let finalCallback = callback || this.callback;
 
   let basePath = this.context;
 
-  const buildRouteForDirectory = (directory) => {
+  const buildRouteForDirectory = (directory, parentDirectoryPath) => {
     let route = {
       component: null
     , path: null
@@ -16,30 +16,56 @@ export default function(source) {
     , dynamicRoutes: []
     };
 
-    fs.readdirSync(directory).forEach((file) => {
+    let directoryItems = fs.readdirSync(directory);
+
+    let indexOfRouteComponent = directoryItems.indexOf("index.js");
+
+    // evaluate the route component first to set up parent paths
+    if(indexOfRouteComponent >= 0) {
+      let fullPath = `${directory}/index.js`;
+
+      directoryItems.splice(indexOfRouteComponent, 1);
+
+      console.log("FULL PATH", fullPath);
+      this.dependency(fullPath);
+
+      route.component = fullPath;
+
+      let path;
+
+      // we only want the route path to be that of the previous parent onwards
+      if(parentDirectoryPath) {
+        path = directory.replace(parentDirectoryPath, "");
+      }
+      else {
+        path = directory.replace(basePath, "");
+      }
+
+      // all react-router paths are absolute
+      if(path === "") {
+        path = "/";
+      }
+      else {
+        // simply replace @ with : for dynamic segments in react-router
+        path = path.replace(/@/g, ":");
+      }
+
+      // this is now the parent route path of any child routes processed later
+      parentDirectoryPath = `${directory}/`;
+
+      console.log("PATH", path);
+
+      route.path = path;
+    }
+
+    directoryItems.forEach((file) => {
       let fullPath = `${directory}/${file}`;
 
-      if(file === "index.js") {
-        this.dependency(fullPath);
-
-        route.component = fullPath;
-
-        let path = directory.replace(basePath, "");
-
-        // all react-router paths are absolute
-        if(path === "") {
-          path = "/";
-        }
-        else {
-          // simply replace @ with : for dynamic segments in react-router
-          path = path.replace(/@/g, ":");
-        }
-
-        route.path = path;
-      }
-      else if(file !== "node_modules" && file !== ".git") {
+      if(file !== "node_modules" && file !== ".git") {
         if(fs.statSync(fullPath).isDirectory()) {
-          let childRoute = buildRouteForDirectory(fullPath);
+          console.log("PARENT PATH", parentDirectoryPath);
+
+          let childRoute = buildRouteForDirectory(fullPath, parentDirectoryPath);
 
           if(childRoute) {
             if(file.startsWith("@")) {
@@ -54,8 +80,10 @@ export default function(source) {
     });
 
     if(route.component && route.path) {
+      // evaluate static routes first and dynamic segments last
       let childRoutes = [...route.childRoutes, ...route.dynamicRoutes];
 
+      // this is the only bit of code emitted to your application
       return `
         {
           getComponents: function(location, callback) {
