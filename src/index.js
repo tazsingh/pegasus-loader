@@ -1,7 +1,7 @@
 import fs from "fs";
 import loaderUtils from "loader-utils";
 
-export default function(source) {
+module.exports = function(source) {
   let callback = this.async();
   let isSync = "function" !== typeof callback;
   let finalCallback = callback || this.callback;
@@ -61,7 +61,7 @@ export default function(source) {
           getComponents: function(location, callback) {
             require.ensure([], function(require) {
               callback(null,
-                require(${loaderUtils.stringifyRequest(this, route.component)})
+                require(${loaderUtils.stringifyRequest(this, route.component)}).default
               );
             });
           }
